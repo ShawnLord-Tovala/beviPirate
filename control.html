@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Bevi Control</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0d0f;
+      --surface: #18181c;
+      --surface2: #222228;
+      --border: #2e2e38;
+      --accent: #4fc3f7;
+      --accent2: #81d4fa;
+      --green: #69f0ae;
+      --red: #ff5252;
+      --yellow: #ffd740;
+      --text: #e8e8f0;
+      --muted: #666678;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, sans-serif;
+      min-height: 100dvh;
+      padding-bottom: 32px;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    header h1 { font-size: 1rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); }
+    #status-badge {
+      font-size: .7rem;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 999px;
+      letter-spacing: .04em;
+      background: var(--surface2);
+      color: var(--muted);
+      transition: background .3s, color .3s;
+    }
+    #status-badge.connecting { background: #2a2200; color: var(--yellow); }
+    #status-badge.connected  { background: #002a14; color: var(--green); }
+    #status-badge.error      { background: #2a0000; color: var(--red); }
+
+    /* ── Section ── */
+    section { padding: 14px 16px 0; }
+    section h2 {
+      font-size: .68rem;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    /* ── Water type pills ── */
+    #water-types {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .water-btn {
+      flex: 1;
+      min-width: 80px;
+      padding: 9px 6px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--muted);
+      font-size: .78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .15s;
+      text-align: center;
+    }
+    .water-btn:active { opacity: .7; }
+    .water-btn.active {
+      background: #0d2a3a;
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* ── Flavors grid ── */
+    #flavors-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+    .flavor-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
+      user-select: none;
+    }
+    .flavor-card:active { opacity: .75; }
+    .flavor-card.active {
+      border-color: var(--accent);
+      background: #0d2230;
+    }
+    .flavor-name {
+      font-size: .85rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: var(--text);
+    }
+    .flavor-code {
+      font-size: .65rem;
+      color: var(--muted);
+      margin-bottom: 8px;
+      font-family: monospace;
+    }
+    .intensity-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .intensity-row input[type=range] {
+      flex: 1;
+      accent-color: var(--accent);
+      height: 4px;
+    }
+    .intensity-val {
+      font-size: .7rem;
+      color: var(--accent);
+      width: 18px;
+      text-align: right;
+    }
+
+    #flavors-loading {
+      color: var(--muted);
+      font-size: .85rem;
+      padding: 8px 0;
+    }
+    #flavors-error {
+      display: none;
+      background: #1a0a00;
+      border: 1px solid #3a1a00;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: .78rem;
+      color: #ffab40;
+      line-height: 1.5;
+    }
+
+    /* ── Dispense button ── */
+    #dispense-wrap {
+      padding: 20px 16px 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+    }
+    #btn-dispense {
+      width: 100%;
+      max-width: 340px;
+      height: 90px;
+      border-radius: 20px;
+      border: none;
+      background: linear-gradient(135deg, #004d70, #0277bd);
+      color: #fff;
+      font-size: 1.2rem;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: transform .1s, box-shadow .1s;
+      box-shadow: 0 4px 20px rgba(79,195,247,.25);
+      touch-action: none;
+    }
+    #btn-dispense:active, #btn-dispense.pouring {
+      transform: scale(.97);
+      background: linear-gradient(135deg, #006491, #0288d1);
+      box-shadow: 0 2px 10px rgba(79,195,247,.4);
+    }
+    #btn-dispense.pouring { background: linear-gradient(135deg, #007a0f, #00b020); }
+    #dispense-hint { font-size: .72rem; color: var(--muted); }
+
+    /* Auto-pour + top-up row */
+    #quick-row {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+      max-width: 340px;
+    }
+    #btn-auto, #btn-topup {
+      flex: 1;
+      padding: 14px 8px;
+      border: none;
+      border-radius: 14px;
+      font-size: .85rem;
+      font-weight: 700;
+      cursor: pointer;
+      touch-action: none;
+      transition: opacity .15s, transform .1s;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+    }
+    #btn-auto:active, #btn-topup:active { opacity: .7; transform: scale(.97); }
+    #btn-auto  { background: linear-gradient(135deg, #1a3a50, #0d5c8a); color: #81d4fa; border: 1px solid #1e5070; }
+    #btn-topup { background: linear-gradient(135deg, #1a2a1a, #1a4a1a); color: #69f0ae; border: 1px solid #1a3a1a; }
+    #btn-auto[disabled] { opacity: .3; cursor: default; }
+
+    /* ── Log ── */
+    #log-wrap { padding: 14px 16px 0; }
+    #log-wrap h2 { font-size: .68rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-bottom: 8px; }
+    #log {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      max-height: 150px;
+      overflow-y: auto;
+      font-size: .7rem;
+      font-family: monospace;
+      color: #888;
+    }
+    .log-line { margin-bottom: 3px; }
+    .log-line.out { color: var(--accent); }
+    .log-line.in  { color: var(--green); }
+    .log-line.err { color: var(--red); }
+
+    /* ── Util ── */
+    .sep { height: 1px; background: var(--border); margin: 14px 16px 0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Bevi Control</h1>
+  <span id="status-badge">Disconnected</span>
+</header>
+
+<section>
+  <h2>Water Type</h2>
+  <div id="water-types">
+    <button class="water-btn active" data-type="ColdStill">Still</button>
+    <button class="water-btn" data-type="Sparkling">Sparkling</button>
+    <button class="water-btn" data-type="ExtraSparkling">Extra Sparkling</button>
+    <button class="water-btn" data-type="Ambient">Ambient</button>
+    <button class="water-btn" data-type="Hot">Hot</button>
+  </div>
+</section>
+
+<div class="sep"></div>
+
+<section>
+  <h2>Flavors</h2>
+  <div id="flavors-loading">Connecting…</div>
+  <div id="flavors-error"></div>
+  <div id="flavors-grid" style="display:none"></div>
+</section>
+
+<div id="dispense-wrap">
+  <button id="btn-dispense">Hold to Pour</button>
+  <div id="quick-row">
+    <button id="btn-auto" disabled>Auto Pour</button>
+    <button id="btn-topup">Top Up (3s)</button>
+  </div>
+  <div id="dispense-hint">Hold to pour • Auto uses your last pour time</div>
+</div>
+
+<div class="sep"></div>
+
+<div id="log-wrap">
+  <h2>WS Log</h2>
+  <div id="log"></div>
+</div>
+
+<script>
+// ── URL params ──────────────────────────────────────────────────
+const params    = new URLSearchParams(location.search);
+const TABLET_ID = params.get('tabletId') || '';
+const TOKEN     = params.get('token')    || '';
+
+if (!TABLET_ID || !TOKEN) {
+  document.querySelector('header h1').textContent = 'Missing params';
+  document.getElementById('status-badge').textContent = 'No tabletId/token in URL';
+  document.getElementById('status-badge').className = 'error';
+}
+
+// ── Device hash (UUID stored in localStorage, sent on WS open) ──
+const DEVICE_ID_KEY = 'bevi.touchless.deviceid';
+function getOrCreateDeviceId() {
+  let id = localStorage.getItem(DEVICE_ID_KEY);
+  if (!id) {
+    // UUID v4 — same algorithm as Bevi's Fm()
+    let t = Date.now();
+    id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+      const r = (t + Math.random() * 16) % 16 | 0;
+      t = Math.floor(t / 16);
+      return (c === 'x' ? r : (r & 3 | 8)).toString(16);
+    });
+    localStorage.setItem(DEVICE_ID_KEY, id);
+  }
+  return id;
+}
+const DEVICE_HASH = getOrCreateDeviceId();
+
+// ── Settings (localStorage) ─────────────────────────────────────
+const SETTINGS_KEY = 'bevi.settings';
+
+function loadSettings() {
+  try { return JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch { return {}; }
+}
+function saveSettings(patch) {
+  const s = { ...loadSettings(), ...patch };
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+  return s;
+}
+
+// ── State ───────────────────────────────────────────────────────
+let ws             = null;
+let flavors        = [];
+let waterType      = 'ColdStill';
+let dispensing     = false;
+let keepaliveTimer = null;
+let pourStartTime  = null;    // when hold began (ms)
+let storedPourMs   = loadSettings().pourMs ?? null;  // last recorded hold duration
+
+// ── DOM refs ────────────────────────────────────────────────────
+const badge         = document.getElementById('status-badge');
+const flavorsGrid   = document.getElementById('flavors-grid');
+const flavorsLoad   = document.getElementById('flavors-loading');
+const flavorsErr    = document.getElementById('flavors-error');
+const btnDispense   = document.getElementById('btn-dispense');
+const logEl         = document.getElementById('log');
+
+// ── Logging ─────────────────────────────────────────────────────
+function addLog(msg, type = '') {
+  const ts  = new Date().toLocaleTimeString('en', {hour12:false});
+  const el  = document.createElement('div');
+  el.className = `log-line ${type}`;
+  el.textContent = `${ts} ${msg}`;
+  logEl.prepend(el);
+  // trim
+  while (logEl.children.length > 60) logEl.removeChild(logEl.lastChild);
+}
+
+// ── WebSocket ───────────────────────────────────────────────────
+function connect() {
+  if (!TABLET_ID || !TOKEN) return;
+  // Token is passed raw in the path — same as Bevi's Bm() function (no encodeURIComponent)
+  const url = `wss://bevitouchless.co/user-side/${TABLET_ID}/${TOKEN}`;
+  addLog(`Connecting to ${url}`, 'out');
+  setStatus('connecting', 'Connecting…');
+
+  ws = new WebSocket(url);
+
+  ws.onopen = () => {
+    addLog('WS open', 'in');
+    setStatus('connected', 'Connected');
+    send({ cmd: 'hash', value: DEVICE_HASH });
+    // Restore saved water type
+    const saved = loadSettings();
+    if (saved.waterType) setWaterType(saved.waterType, true);
+    fetchFlavors();
+    startKeepalive();
+    updateAutoPourButton();
+  };
+
+  ws.onmessage = (ev) => {
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch { addLog(`RAW: ${ev.data}`, 'in'); return; }
+    addLog(`← ${JSON.stringify(msg)}`, 'in');
+    handleServerMsg(msg);
+  };
+
+  ws.onclose = (ev) => {
+    const reason = ev.reason || '';
+    addLog(`WS closed: ${ev.code} ${reason}`, 'err');
+    stopKeepalive();
+    stopDispense();
+    // Timeout = session expired, QR code is stale — send back to scanner
+    const isTimeout = reason.toLowerCase().includes('timeout') || reason.toLowerCase().includes('bevi_timeout');
+    if (isTimeout || ev.code === 4001) {
+      setStatus('error', 'Session expired — redirecting…');
+      setTimeout(() => { window.location.href = 'index.html'; }, 2000);
+    } else if (ev.code !== 1000) {
+      setStatus('connecting', 'Reconnecting…');
+      setTimeout(connect, 3000);
+    } else {
+      setStatus('error', `Closed (${ev.code})`);
+    }
+  };
+
+  ws.onerror = () => {
+    addLog('WS error', 'err');
+    setStatus('error', 'Error');
+  };
+}
+
+function send(obj) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) { addLog('Not connected', 'err'); return; }
+  addLog(`→ ${JSON.stringify(obj)}`, 'out');
+  ws.send(JSON.stringify(obj));
+}
+
+function handleServerMsg(msg) {
+  switch (msg.cmd) {
+    case 'ack':
+      if (msg.value === 'register') addLog('Registered!', 'in');
+      break;
+    case 'ping':
+      send({ cmd: 'pong', value: msg.value });
+      break;
+    case 'subtext': {
+      if (!msg.code) break;
+      let f = findFlavor(undefined, msg.code);
+      if (!f) {
+        // Restore saved intensity/active from settings if available
+        const saved = (loadSettings().flavors || []).find(s => s.code === msg.code);
+        f = {
+          code:      msg.code,
+          name:      codeToName(msg.code),
+          position:  null,
+          active:    saved?.active    ?? false,
+          intensity: saved?.intensity ?? 3,
+          subtext:   msg.value,
+        };
+        flavors.push(f);
+        // Re-send saved state to machine
+        if (f.active) send({ cmd: 'flavor', value: true, position: f.position, code: f.code });
+      } else {
+        f.subtext = msg.value;
+      }
+      renderFlavors();
+      break;
+    }
+    case 'flavor': {
+      const f = findFlavor(msg.position, msg.code);
+      if (f) { f.active = msg.value; if (msg.position != null) f.position = msg.position; renderFlavors(); }
+      break;
+    }
+    case 'intensity': {
+      const f = findFlavor(msg.position, msg.code);
+      if (f) { f.intensity = msg.value; renderFlavors(); }
+      break;
+    }
+    case 'water':
+      setWaterType(msg.value, false);
+      break;
+    case 'waters':
+      syncAvailableWaters(msg);
+      break;
+    case 'unregister':
+      addLog(`Unregistered: ${msg.reason}`, 'err');
+      setStatus('error', 'Session ended — redirecting…');
+      stopDispense();
+      setTimeout(() => { window.location.href = 'index.html'; }, 2000);
+      break;
+    case 'error':
+      addLog('Server error', 'err');
+      break;
+    default:
+      break;
+  }
+}
+
+// Convert "peach_mango_133" → "Peach Mango"
+function codeToName(code) {
+  const parts = code.split('_');
+  // drop trailing numeric ID
+  const words = parts[parts.length - 1].match(/^\d+$/) ? parts.slice(0, -1) : parts;
+  return words.map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+function startKeepalive() {
+  stopKeepalive();
+  keepaliveTimer = setInterval(() => send({ cmd: 'noop' }), 20000);
+}
+function stopKeepalive() {
+  if (keepaliveTimer) { clearInterval(keepaliveTimer); keepaliveTimer = null; }
+}
+
+// ── Flavors — built from WS subtext messages, no REST needed ────
+function fetchFlavors() {
+  // Flavors arrive via subtext messages after registration.
+  // Just show a waiting state — handleServerMsg fills them in.
+  flavorsLoad.textContent = 'Waiting for flavor list…';
+  flavorsGrid.style.display = 'none';
+  flavorsErr.style.display  = 'none';
+}
+
+// ── Render flavors ───────────────────────────────────────────────
+function renderFlavors() {
+  if (!flavors.length) {
+    flavorsGrid.style.display = 'none';
+    if (flavorsLoad.style.display !== 'none') return;
+    flavorsLoad.style.display  = 'block';
+    flavorsLoad.textContent    = 'No flavors available for this machine.';
+    return;
+  }
+  flavorsGrid.style.display = 'grid';
+  flavorsLoad.style.display = 'none';
+  flavorsGrid.innerHTML = '';
+
+  flavors.forEach(f => {
+    const card = document.createElement('div');
+    card.className = `flavor-card${f.active ? ' active' : ''}`;
+    card.dataset.code = f.code;
+    card.innerHTML = `
+      <div class="flavor-name">${escHtml(f.name)}</div>
+      <div class="flavor-code">${escHtml(f.code)}</div>
+      <div class="intensity-row">
+        <input type="range" min="1" max="5" value="${f.intensity}"
+               data-code="${escHtml(f.code)}" data-pos="${f.position}" />
+        <span class="intensity-val">${f.intensity}</span>
+      </div>`;
+
+    // Toggle active
+    card.addEventListener('click', (e) => {
+      if (e.target.tagName === 'INPUT') return; // don't toggle when sliding
+      f.active = !f.active;
+      send({ cmd: 'flavor', value: f.active, position: f.position, code: f.code });
+      saveSettings({ flavors: flavors.map(x => ({ code: x.code, active: x.active, intensity: x.intensity })) });
+      renderFlavors();
+    });
+
+    // Intensity change
+    card.querySelector('input').addEventListener('input', (e) => {
+      f.intensity = Number(e.target.value);
+      e.target.nextElementSibling.textContent = f.intensity;
+    });
+    card.querySelector('input').addEventListener('change', (e) => {
+      f.intensity = Number(e.target.value);
+      send({ cmd: 'intensity', value: f.intensity, position: f.position, code: f.code });
+      saveSettings({ flavors: flavors.map(x => ({ code: x.code, active: x.active, intensity: x.intensity })) });
+    });
+
+    flavorsGrid.appendChild(card);
+  });
+}
+
+function findFlavor(position, code) {
+  return flavors.find(f =>
+    (position !== undefined && f.position === position) ||
+    (code     !== undefined && f.code     === code)
+  ) || null;
+}
+
+// ── Water type ──────────────────────────────────────────────────
+document.getElementById('water-types').addEventListener('click', (e) => {
+  const btn = e.target.closest('.water-btn');
+  if (!btn) return;
+  setWaterType(btn.dataset.type, true);
+});
+
+function setWaterType(type, sendCmd) {
+  waterType = type;
+  document.querySelectorAll('.water-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.type === type);
+  });
+  if (sendCmd) {
+    send({ cmd: 'water', value: type });
+    saveSettings({ waterType: type });
+  }
+}
+
+function syncAvailableWaters(msg) {
+  document.querySelectorAll('.water-btn').forEach(b => {
+    const key = b.dataset.type;
+    if (key in msg) b.style.opacity = msg[key] ? '1' : '0.3';
+  });
+}
+
+// ── Dispense ────────────────────────────────────────────────────
+let dispenseTimer   = null;
+let autoStopTimer   = null;
+
+function getDispensePosition() {
+  const active = flavors.find(f => f.active);
+  return active ? active.position : 0;
+}
+
+function updateAutoPourButton() {
+  const btn  = document.getElementById('btn-auto');
+  const secs = storedPourMs != null ? Math.max(1, Math.round((storedPourMs - 2000) / 1000)) : null;
+  if (secs != null && secs > 0) {
+    btn.textContent = `Auto Pour (${secs}s)`;
+    btn.disabled    = false;
+  } else {
+    btn.textContent = 'Auto Pour';
+    btn.disabled    = true;
+  }
+}
+
+function startDispenseCmd() {
+  send({ cmd: 'dispense', value: true, position: getDispensePosition() });
+  clearInterval(dispenseTimer);
+  dispenseTimer = setInterval(() => {
+    if (dispensing) send({ cmd: 'dispense', value: true, position: getDispensePosition() });
+  }, 3000);
+}
+
+function startDispense() {
+  if (dispensing) return;
+  dispensing    = true;
+  pourStartTime = Date.now();
+  btnDispense.classList.add('pouring');
+  btnDispense.textContent = 'Pouring…';
+  startDispenseCmd();
+}
+
+function stopDispense() {
+  if (!dispensing) return;
+  dispensing = false;
+  clearInterval(dispenseTimer);
+  clearTimeout(autoStopTimer);
+  dispenseTimer = autoStopTimer = null;
+  btnDispense.classList.remove('pouring');
+  btnDispense.textContent = 'Hold to Pour';
+  send({ cmd: 'dispense', value: false, position: getDispensePosition() });
+
+  // Record duration if from a manual hold (not auto-pour)
+  if (pourStartTime) {
+    storedPourMs = Date.now() - pourStartTime;
+    saveSettings({ pourMs: storedPourMs });
+    updateAutoPourButton();
+    pourStartTime = null;
+  }
+}
+
+function triggerTimedPour(ms, updateStored) {
+  if (dispensing) return;
+  dispensing = true;
+  pourStartTime = null;   // don't record auto-triggered pours
+  btnDispense.classList.add('pouring');
+  btnDispense.textContent = 'Pouring…';
+  startDispenseCmd();
+  autoStopTimer = setTimeout(() => stopDispense(), ms);
+}
+
+// Hold to Pour — mouse
+btnDispense.addEventListener('mousedown',  startDispense);
+btnDispense.addEventListener('mouseup',    stopDispense);
+btnDispense.addEventListener('mouseleave', stopDispense);
+// Hold to Pour — touch
+btnDispense.addEventListener('touchstart', (e) => { e.preventDefault(); startDispense(); }, { passive: false });
+btnDispense.addEventListener('touchend',   (e) => { e.preventDefault(); stopDispense();  }, { passive: false });
+btnDispense.addEventListener('touchcancel',(e) => { e.preventDefault(); stopDispense();  }, { passive: false });
+
+// Auto Pour — stored duration minus 2s
+document.getElementById('btn-auto').addEventListener('click', () => {
+  if (storedPourMs == null) return;
+  const ms = Math.max(1000, storedPourMs - 2000);
+  triggerTimedPour(ms, false);
+});
+
+// Top Up — hold to pour, not recorded
+const btnTopup = document.getElementById('btn-topup');
+function startTopUp() {
+  if (dispensing) return;
+  dispensing    = true;
+  pourStartTime = null;   // null = don't record on release
+  btnTopup.style.background = 'linear-gradient(135deg, #003a10, #006020)';
+  startDispenseCmd();
+}
+function stopTopUp() {
+  if (!dispensing) return;
+  dispensing = false;
+  clearInterval(dispenseTimer);
+  clearTimeout(autoStopTimer);
+  dispenseTimer = autoStopTimer = null;
+  btnTopup.style.background = '';
+  send({ cmd: 'dispense', value: false, position: getDispensePosition() });
+  pourStartTime = null;
+}
+btnTopup.addEventListener('mousedown',  startTopUp);
+btnTopup.addEventListener('mouseup',    stopTopUp);
+btnTopup.addEventListener('mouseleave', stopTopUp);
+btnTopup.addEventListener('touchstart', (e) => { e.preventDefault(); startTopUp(); },  { passive: false });
+btnTopup.addEventListener('touchend',   (e) => { e.preventDefault(); stopTopUp(); },   { passive: false });
+btnTopup.addEventListener('touchcancel',(e) => { e.preventDefault(); stopTopUp(); },   { passive: false });
+
+// ── Utils ───────────────────────────────────────────────────────
+function setStatus(cls, text) {
+  badge.className = cls;
+  badge.textContent = text;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Boot ────────────────────────────────────────────────────────
+if (TABLET_ID && TOKEN) connect();
+</script>
+</body>
+</html>

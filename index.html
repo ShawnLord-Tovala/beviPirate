@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Bevi QR Scanner</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #111;
+      color: #eee;
+      font-family: system-ui, -apple-system, sans-serif;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      padding: 12px 16px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #4fc3f7;
+    }
+
+    #camera-wrap {
+      position: relative;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    #video {
+      width: 100%;
+      display: block;
+      border-radius: 0;
+    }
+
+    /* scan-line overlay */
+    #scan-line {
+      position: absolute;
+      left: 10%;
+      right: 10%;
+      height: 2px;
+      background: #4fc3f7;
+      box-shadow: 0 0 8px #4fc3f7;
+      animation: scan 2s linear infinite;
+      pointer-events: none;
+    }
+    @keyframes scan {
+      0%   { top: 10%; }
+      50%  { top: 88%; }
+      100% { top: 10%; }
+    }
+
+    /* corner brackets */
+    #overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+    #overlay::before, #overlay::after,
+    #overlay span::before, #overlay span::after {
+      content: '';
+      position: absolute;
+      width: 28px;
+      height: 28px;
+      border-color: #4fc3f7;
+      border-style: solid;
+    }
+    #overlay::before    { top: 10%; left: 10%; border-width: 3px 0 0 3px; }
+    #overlay::after     { top: 10%; right: 10%; border-width: 3px 3px 0 0; }
+    #overlay span::before { bottom: 10%; left: 10%; border-width: 0 0 3px 3px; }
+    #overlay span::after  { bottom: 10%; right: 10%; border-width: 0 3px 3px 0; }
+
+    canvas { display: none; }
+
+    #result-box {
+      width: 100%;
+      max-width: 480px;
+      padding: 16px;
+    }
+
+    #status {
+      font-size: 0.85rem;
+      color: #888;
+      text-align: center;
+      margin-bottom: 10px;
+      min-height: 1.2em;
+    }
+
+    #result {
+      display: none;
+      background: #1e1e1e;
+      border: 1px solid #333;
+      border-radius: 10px;
+      padding: 14px;
+    }
+
+    #result label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #4fc3f7;
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    #url-text {
+      font-size: 0.95rem;
+      word-break: break-all;
+      color: #fff;
+      margin-bottom: 12px;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      flex: 1;
+      min-width: 100px;
+      padding: 10px 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    button:active { opacity: 0.7; }
+
+    #btn-open   { background: #4fc3f7; color: #111; }
+    #btn-copy   { background: #333;    color: #eee; }
+    #btn-scan   { background: #222;    color: #4fc3f7; border: 1px solid #4fc3f7; }
+
+    /* Minimized camera after scan */
+    #camera-wrap {
+      transition: max-height 0.4s ease, opacity 0.4s ease;
+      overflow: hidden;
+    }
+    #camera-wrap.minimized {
+      max-height: 0 !important;
+      opacity: 0;
+    }
+
+    /* Highlighted control panel button */
+    #btn-control {
+      flex: 1 1 100%;
+      padding: 16px 12px;
+      border: none;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 800;
+      cursor: pointer;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, #69f0ae, #00bfa5);
+      color: #001a10;
+      box-shadow: 0 4px 20px rgba(105,240,174,0.35);
+      animation: pulse-btn 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse-btn {
+      0%, 100% { box-shadow: 0 4px 20px rgba(105,240,174,0.35); }
+      50%       { box-shadow: 0 4px 32px rgba(105,240,174,0.7); }
+    }
+
+    #log-section {
+      width: 100%;
+      max-width: 480px;
+      padding: 0 16px 24px;
+    }
+
+    #log-section h2 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #555;
+      margin-bottom: 8px;
+    }
+
+    #log {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 10px;
+      max-height: 200px;
+      overflow-y: auto;
+      font-size: 0.75rem;
+      font-family: monospace;
+      color: #aaa;
+    }
+
+    .log-entry { margin-bottom: 4px; }
+    .log-entry.new { color: #4fc3f7; }
+    .log-ts { color: #555; margin-right: 6px; }
+  </style>
+</head>
+<body>
+
+<h1>Bevi QR Scanner</h1>
+
+<div id="camera-wrap">
+  <video id="video" autoplay playsinline muted></video>
+  <div id="overlay"><span></span></div>
+  <div id="scan-line"></div>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<div id="result-box">
+  <div id="status">Starting camera…</div>
+
+  <div id="result">
+    <label>Scanned URL</label>
+    <div id="url-text"></div>
+    <div class="btn-row">
+      <button id="btn-open">Open URL</button>
+      <button id="btn-copy">Copy</button>
+      <button id="btn-scan">Scan Again</button>
+    </div>
+  </div>
+</div>
+
+<div id="log-section">
+  <h2>Scan History</h2>
+  <div id="log"><div class="log-entry" style="color:#555">No scans yet.</div></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script>
+  const video   = document.getElementById('video');
+  const canvas  = document.getElementById('canvas');
+  const ctx     = canvas.getContext('2d');
+  const status  = document.getElementById('status');
+  const result  = document.getElementById('result');
+  const urlText = document.getElementById('url-text');
+  const log     = document.getElementById('log');
+
+  let scanning  = true;
+  let lastCode  = null;
+  let rafId     = null;
+
+  // --- Camera ---
+  async function startCamera() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      });
+      video.srcObject = stream;
+      video.addEventListener('loadedmetadata', () => {
+        canvas.width  = video.videoWidth;
+        canvas.height = video.videoHeight;
+        status.textContent = 'Point at a QR code…';
+        tick();
+      });
+    } catch (e) {
+      status.textContent = 'Camera error: ' + e.message;
+    }
+  }
+
+  // --- Scan loop ---
+  function tick() {
+    if (!scanning) return;
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imgData.data, imgData.width, imgData.height, {
+        inversionAttempts: 'dontInvert'
+      });
+      if (code && code.data !== lastCode) {
+        lastCode = code.data;
+        onDetected(code.data);
+        return; // pause scanning until user resumes
+      }
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+
+  // --- Parse Bevi QR URL ---
+  // Format: https://bevitouchless.co/{deviceType}/{tabletId}/{token}
+  function parseBeviUrl(data) {
+    try {
+      const url = new URL(data);
+      if (!url.hostname.includes('bevitouchless')) return null;
+      const parts = url.pathname.split('/').filter(Boolean);
+      if (parts.length < 3) return null;
+      return { deviceType: parts[0], tabletId: parts[1], token: parts[2] };
+    } catch { return null; }
+  }
+
+  // --- Handle result ---
+  function onDetected(data) {
+    scanning = false;
+    cancelAnimationFrame(rafId);
+
+    urlText.textContent = data;
+    result.style.display = 'block';
+    status.textContent   = 'QR code detected!';
+
+    addLog(data);
+
+    // Collapse camera view
+    document.getElementById('camera-wrap').classList.add('minimized');
+
+    // If it's a Bevi URL, go straight to the control page
+    const bevi = parseBeviUrl(data);
+    if (bevi) {
+      const controlUrl = `control.html?tabletId=${encodeURIComponent(bevi.tabletId)}&token=${encodeURIComponent(bevi.token)}`;
+      window.location.href = controlUrl;
+    }
+  }
+
+  function addLog(data) {
+    const ts   = new Date().toLocaleTimeString();
+    const old  = log.querySelector('[style="color:#555"]');
+    if (old) old.remove();
+
+    const el = document.createElement('div');
+    el.className = 'log-entry new';
+    el.innerHTML = `<span class="log-ts">${ts}</span>${escapeHtml(data)}`;
+    log.prepend(el);
+
+    // remove "new" style after a moment
+    setTimeout(() => el.classList.remove('new'), 2000);
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // --- Buttons ---
+  document.getElementById('btn-open').addEventListener('click', () => {
+    if (lastCode) window.open(lastCode, '_blank');
+  });
+
+  document.getElementById('btn-copy').addEventListener('click', async () => {
+    if (!lastCode) return;
+    try {
+      await navigator.clipboard.writeText(lastCode);
+      const btn = document.getElementById('btn-copy');
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy', 1500);
+    } catch (e) {
+      alert(lastCode); // fallback: show in alert so user can copy manually
+    }
+  });
+
+  document.getElementById('btn-scan').addEventListener('click', () => {
+    result.style.display = 'none';
+    status.textContent   = 'Point at a QR code…';
+    lastCode  = null;
+    scanning  = true;
+    document.getElementById('camera-wrap').classList.remove('minimized');
+    const existing = document.getElementById('btn-control');
+    if (existing) existing.remove();
+    tick();
+  });
+
+  // --- Start ---
+  startCamera();
+</script>
+</body>
+</html>
