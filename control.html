@@ -248,6 +248,35 @@
     .log-line.in  { color: var(--green); }
     .log-line.err { color: var(--red); }
 
+    /* ── Session ended overlay ── */
+    #session-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.85);
+      z-index: 100;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 32px;
+      text-align: center;
+    }
+    #session-overlay.show { display: flex; }
+    #session-overlay h2 { font-size: 1.2rem; color: var(--red); }
+    #session-overlay p  { font-size: .9rem; color: #ccc; line-height: 1.5; }
+    #session-overlay .countdown { font-size: .75rem; color: var(--muted); }
+    #btn-rescan {
+      padding: 14px 32px;
+      background: var(--accent);
+      color: #111;
+      border: none;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
     /* ── Util ── */
     .sep { height: 1px; background: var(--border); margin: 14px 16px 0; }
   </style>
@@ -290,6 +319,13 @@
 </div>
 
 <div class="sep"></div>
+
+<div id="session-overlay">
+  <h2 id="overlay-title">Session Ended</h2>
+  <p id="overlay-msg"></p>
+  <button id="btn-rescan" onclick="window.location.href='index.html'">Scan Again</button>
+  <div class="countdown" id="overlay-countdown"></div>
+</div>
 
 <div id="log-wrap">
   <h2>WS Log</h2>
@@ -403,8 +439,7 @@ function connect() {
     // Timeout = session expired, QR code is stale — send back to scanner
     const isTimeout = reason.toLowerCase().includes('timeout') || reason.toLowerCase().includes('bevi_timeout');
     if (isTimeout || ev.code === 4001) {
-      setStatus('error', 'Session expired — redirecting…');
-      setTimeout(() => { window.location.href = 'index.html'; }, 2000);
+      showSessionEnded(reason || 'Session timed out.');
     } else if (ev.code !== 1000) {
       setStatus('connecting', 'Reconnecting…');
       setTimeout(connect, 3000);
@@ -474,9 +509,8 @@ function handleServerMsg(msg) {
       break;
     case 'unregister':
       addLog(`Unregistered: ${msg.reason}`, 'err');
-      setStatus('error', 'Session ended — redirecting…');
       stopDispense();
-      setTimeout(() => { window.location.href = 'index.html'; }, 2000);
+      showSessionEnded(msg.reason);
       break;
     case 'error':
       addLog('Server error', 'err');
@@ -699,6 +733,45 @@ function setStatus(cls, text) {
 
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Session ended overlay ────────────────────────────────────────
+let countdownTimer = null;
+function showSessionEnded(reason) {
+  stopDispense();
+  stopKeepalive();
+  setStatus('error', 'Session ended');
+
+  const r = (reason || '').toLowerCase();
+  const isTimeout  = r.includes('timeout') || r.includes('bevi_timeout');
+  const isTakeover = r.includes('unregister') || r.includes('taken');
+
+  document.getElementById('overlay-title').textContent =
+    isTimeout  ? 'Session Timed Out' :
+    isTakeover ? 'Machine Taken Over' :
+                 'Session Ended';
+
+  document.getElementById('overlay-msg').textContent =
+    isTimeout  ? 'Your session expired due to inactivity. Scan the QR code again to start a new one.' :
+    isTakeover ? 'Someone else has taken control of this machine.' :
+                 (reason || 'The machine ended your session.');
+
+  document.getElementById('session-overlay').classList.add('show');
+
+  // Countdown to auto-redirect
+  let secs = 10;
+  const cd = document.getElementById('overlay-countdown');
+  cd.textContent = `Returning to scanner in ${secs}s…`;
+  clearInterval(countdownTimer);
+  countdownTimer = setInterval(() => {
+    secs--;
+    if (secs <= 0) {
+      clearInterval(countdownTimer);
+      window.location.href = 'index.html';
+    } else {
+      cd.textContent = `Returning to scanner in ${secs}s…`;
+    }
+  }, 1000);
 }
 
 // ── E-Stop ──────────────────────────────────────────────────────
