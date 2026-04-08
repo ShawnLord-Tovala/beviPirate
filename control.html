@@ -677,7 +677,7 @@ function stopDispense() {
 
   // Record duration if from a manual hold (not auto-pour)
   if (pourStartTime) {
-    storedPourMs = Date.now() - pourStartTime;
+    storedPourMs = Math.max(500, (Date.now() - pourStartTime) - 1500);
     saveSettings({ pourMs: storedPourMs });
     updateAutoPourButton();
     pourStartTime = null;
