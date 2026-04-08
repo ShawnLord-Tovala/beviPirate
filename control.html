@@ -266,7 +266,7 @@
   <button id="btn-dispense">Hold to Pour</button>
   <div id="quick-row">
     <button id="btn-auto" disabled>Auto Pour</button>
-    <button id="btn-topup">Top Up (3s)</button>
+    <button id="btn-topup">Top Up</button>
   </div>
   <div id="dispense-hint">Hold to pour • Auto uses your last pour time</div>
 </div>
@@ -601,7 +601,7 @@ function startDispenseCmd() {
   clearInterval(dispenseTimer);
   dispenseTimer = setInterval(() => {
     if (dispensing) send({ cmd: 'dispense', value: true, position: getDispensePosition() });
-  }, 3000);
+  }, 1000);
 }
 
 function startDispense() {
@@ -658,31 +658,20 @@ document.getElementById('btn-auto').addEventListener('click', () => {
   triggerTimedPour(ms, false);
 });
 
-// Top Up — hold to pour, not recorded
+// Top Up — each tap fires a 500ms burst, not recorded
 const btnTopup = document.getElementById('btn-topup');
-function startTopUp() {
+btnTopup.addEventListener('click', () => {
   if (dispensing) return;
-  dispensing    = true;
-  pourStartTime = null;   // null = don't record on release
-  btnTopup.style.background = 'linear-gradient(135deg, #003a10, #006020)';
-  startDispenseCmd();
-}
-function stopTopUp() {
-  if (!dispensing) return;
-  dispensing = false;
-  clearInterval(dispenseTimer);
-  clearTimeout(autoStopTimer);
-  dispenseTimer = autoStopTimer = null;
-  btnTopup.style.background = '';
-  send({ cmd: 'dispense', value: false, position: getDispensePosition() });
   pourStartTime = null;
-}
-btnTopup.addEventListener('mousedown',  startTopUp);
-btnTopup.addEventListener('mouseup',    stopTopUp);
-btnTopup.addEventListener('mouseleave', stopTopUp);
-btnTopup.addEventListener('touchstart', (e) => { e.preventDefault(); startTopUp(); },  { passive: false });
-btnTopup.addEventListener('touchend',   (e) => { e.preventDefault(); stopTopUp(); },   { passive: false });
-btnTopup.addEventListener('touchcancel',(e) => { e.preventDefault(); stopTopUp(); },   { passive: false });
+  dispensing = true;
+  btnTopup.style.background = 'linear-gradient(135deg, #003a10, #006020)';
+  send({ cmd: 'dispense', value: true,  position: getDispensePosition() });
+  setTimeout(() => {
+    send({ cmd: 'dispense', value: false, position: getDispensePosition() });
+    dispensing = false;
+    btnTopup.style.background = '';
+  }, 500);
+});
 
 // ── Utils ───────────────────────────────────────────────────────
 function setStatus(cls, text) {
