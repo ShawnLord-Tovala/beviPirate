@@ -630,14 +630,24 @@ document.getElementById('water-types').addEventListener('click', (e) => {
   setWaterType(btn.dataset.type, true);
 });
 
+const CARBONATED = new Set(['Sparkling', 'ExtraSparkling']);
+function isCarbonated(type) { return CARBONATED.has(type); }
+
 function setWaterType(type, sendCmd) {
+  const crossedBoundary = isCarbonated(waterType) !== isCarbonated(type);
   waterType = type;
   document.querySelectorAll('.water-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.type === type);
   });
   if (sendCmd) {
     send({ cmd: 'water', value: type });
-    saveSettings({ waterType: type });
+    if (crossedBoundary) {
+      storedPourMs = null;
+      saveSettings({ waterType: type, pourMs: null });
+      updateAutoPourButton();
+    } else {
+      saveSettings({ waterType: type });
+    }
   }
 }
 
