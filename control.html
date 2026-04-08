@@ -741,7 +741,7 @@ document.getElementById('btn-auto').addEventListener('click', () => {
   triggerTimedPour(ms, false);
 });
 
-// Top Up — each tap fires a 500ms burst, not recorded
+// Top Up — each tap fires a 1s burst, not recorded
 const btnTopup = document.getElementById('btn-topup');
 btnTopup.addEventListener('click', () => {
   if (dispensing) return;
@@ -753,7 +753,7 @@ btnTopup.addEventListener('click', () => {
     send({ cmd: 'dispense', value: false, position: getDispensePosition() });
     dispensing = false;
     btnTopup.style.background = '';
-  }, 500);
+  }, 1000);
 });
 
 // ── Utils ───────────────────────────────────────────────────────
