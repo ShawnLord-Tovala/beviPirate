@@ -231,7 +231,10 @@
 
     /* ── Log ── */
     #log-wrap { padding: 14px 16px 0; }
-    #log-wrap h2 { font-size: .68rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-bottom: 8px; }
+    #log-wrap .log-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+    #log-wrap h2 { font-size: .68rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+    #btn-download-log { font-size: .68rem; background: var(--surface2); border: 1px solid var(--border); color: var(--muted); padding: 3px 10px; border-radius: 6px; cursor: pointer; }
+    #btn-download-log:active { opacity: .7; }
     #log {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -328,7 +331,10 @@
 </div>
 
 <div id="log-wrap">
-  <h2>WS Log</h2>
+  <div class="log-header">
+    <h2>WS Log</h2>
+    <button id="btn-download-log">Download</button>
+  </div>
   <div id="log"></div>
 </div>
 
@@ -392,15 +398,30 @@ const btnDispense   = document.getElementById('btn-dispense');
 const logEl         = document.getElementById('log');
 
 // ── Logging ─────────────────────────────────────────────────────
+const logBuffer = [];   // full history, never trimmed
+
 function addLog(msg, type = '') {
-  const ts  = new Date().toLocaleTimeString('en', {hour12:false});
-  const el  = document.createElement('div');
+  const ts = new Date().toISOString();
+  logBuffer.push(`${ts} [${type || 'info'}] ${msg}`);
+
+  const el = document.createElement('div');
   el.className = `log-line ${type}`;
-  el.textContent = `${ts} ${msg}`;
+  el.textContent = `${ts.slice(11,19)} ${msg}`;
   logEl.prepend(el);
-  // trim
-  while (logEl.children.length > 60) logEl.removeChild(logEl.lastChild);
+  // Keep the visible list manageable
+  while (logEl.children.length > 200) logEl.removeChild(logEl.lastChild);
 }
+
+document.getElementById('btn-download-log').addEventListener('click', () => {
+  const text = logBuffer.join('\n');
+  const blob = new Blob([text], { type: 'text/plain' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `bevi-log-${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.txt`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
 
 // ── WebSocket ───────────────────────────────────────────────────
 function connect() {
