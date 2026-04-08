@@ -187,6 +187,23 @@
     #btn-dispense.pouring { background: linear-gradient(135deg, #007a0f, #00b020); }
     #dispense-hint { font-size: .72rem; color: var(--muted); }
 
+    #btn-estop {
+      width: 100%;
+      max-width: 340px;
+      padding: 16px;
+      border: none;
+      border-radius: 14px;
+      background: #7a0000;
+      color: #ff6666;
+      font-size: 1rem;
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      border: 2px solid #aa0000;
+    }
+    #btn-estop:active { background: #ff0000; color: #fff; transform: scale(.97); }
+
     /* Auto-pour + top-up row */
     #quick-row {
       display: flex;
@@ -263,6 +280,7 @@
 </section>
 
 <div id="dispense-wrap">
+  <button id="btn-estop">⬛ E-Stop</button>
   <button id="btn-dispense">Hold to Pour</button>
   <div id="quick-row">
     <button id="btn-auto" disabled>Auto Pour</button>
@@ -682,6 +700,20 @@ function setStatus(cls, text) {
 function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+// ── E-Stop ──────────────────────────────────────────────────────
+document.getElementById('btn-estop').addEventListener('click', () => {
+  // Kill all timers
+  clearInterval(dispenseTimer);
+  clearTimeout(autoStopTimer);
+  dispenseTimer = autoStopTimer = pourStartTime = null;
+  // Force-send stop even if we think we're not dispensing
+  send({ cmd: 'dispense', value: false, position: getDispensePosition() });
+  dispensing = false;
+  btnDispense.classList.remove('pouring');
+  btnDispense.textContent = 'Hold to Pour';
+  btnTopup.style.background = '';
+});
 
 // ── Boot ────────────────────────────────────────────────────────
 if (TABLET_ID && TOKEN) connect();
