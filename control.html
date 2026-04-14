@@ -708,7 +708,7 @@ function stopDispense() {
 
   // Record duration if from a manual hold (not auto-pour)
   if (pourStartTime) {
-    storedPourMs = Math.max(500, (Date.now() - pourStartTime) - 1500);
+    storedPourMs = Math.max(500, (Date.now() - pourStartTime) - 500);
     saveSettings({ pourMs: storedPourMs });
     updateAutoPourButton();
     pourStartTime = null;
@@ -734,10 +734,10 @@ btnDispense.addEventListener('touchstart', (e) => { e.preventDefault(); startDis
 btnDispense.addEventListener('touchend',   (e) => { e.preventDefault(); stopDispense();  }, { passive: false });
 btnDispense.addEventListener('touchcancel',(e) => { e.preventDefault(); stopDispense();  }, { passive: false });
 
-// Auto Pour — stored duration minus 2s
+// Auto Pour — stored duration
 document.getElementById('btn-auto').addEventListener('click', () => {
   if (storedPourMs == null) return;
-  const ms = Math.max(1000, storedPourMs - 2000);
+  const ms = Math.max(1000, storedPourMs);
   triggerTimedPour(ms, false);
 });
 
