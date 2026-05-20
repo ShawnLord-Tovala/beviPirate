@@ -240,7 +240,7 @@
 </div>
 
 <div id="camera-wrap">
-  <video id="video" playsinline muted></video>
+  <video id="video" autoplay playsinline muted></video>
   <div id="overlay"><span></span></div>
   <div id="scan-line"></div>
 </div>
@@ -289,14 +289,16 @@
         audio: false
       });
       video.srcObject = stream;
-      try { await video.play(); } catch {}
-      video.addEventListener('loadedmetadata', () => {
+      const onReady = () => {
         canvas.width  = video.videoWidth;
         canvas.height = video.videoHeight;
         status.textContent = 'Point at a QR code…';
         scanning = true;
         tick();
-      }, { once: true });
+      };
+      if (video.readyState >= 1) onReady();
+      else video.addEventListener('loadedmetadata', onReady, { once: true });
+      video.play().catch(() => {});
     } catch (e) {
       status.textContent = 'Camera error: ' + e.message;
     }
