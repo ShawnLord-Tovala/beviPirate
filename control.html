@@ -691,6 +691,7 @@ function startDispense() {
   if (dispensing) return;
   dispensing    = true;
   pourStartTime = Date.now();
+  cancelAutoDisconnect();
   btnDispense.classList.add('pouring');
   btnDispense.textContent = 'Pouring…';
   startDispenseCmd();
@@ -719,10 +720,14 @@ function triggerTimedPour(ms, updateStored) {
   if (dispensing) return;
   dispensing = true;
   pourStartTime = null;   // don't record auto-triggered pours
+  cancelAutoDisconnect();
   btnDispense.classList.add('pouring');
   btnDispense.textContent = 'Pouring…';
   startDispenseCmd();
-  autoStopTimer = setTimeout(() => stopDispense(), ms);
+  autoStopTimer = setTimeout(() => {
+    stopDispense();
+    scheduleAutoDisconnect();
+  }, ms);
 }
 
 // Hold to Pour — mouse
@@ -741,12 +746,60 @@ document.getElementById('btn-auto').addEventListener('click', () => {
   triggerTimedPour(ms, false);
 });
 
+// ── Auto-disconnect after auto-pour ─────────────────────────────
+// After an auto-pour completes, wait 5s of inactivity then disconnect
+// and return to the scanner. Phone sleep / app backgrounding triggers
+// an immediate disconnect.
+const AUTO_DISCONNECT_MS = 5000;
+let autoDisconnectTimer = null;
+let exiting             = false;
+
+function scheduleAutoDisconnect() {
+  if (exiting) return;
+  clearTimeout(autoDisconnectTimer);
+  autoDisconnectTimer = setTimeout(disconnectAndExit, AUTO_DISCONNECT_MS);
+}
+
+function cancelAutoDisconnect() {
+  if (autoDisconnectTimer) {
+    clearTimeout(autoDisconnectTimer);
+    autoDisconnectTimer = null;
+  }
+}
+
+function disconnectAndExit() {
+  if (exiting) return;
+  exiting = true;
+  cancelAutoDisconnect();
+  stopDispense();
+  stopKeepalive();
+  if (ws) {
+    try { ws.close(1000, 'session_complete'); } catch {}
+    ws = null;
+  }
+  sessionStorage.setItem('bevi.returning', '1');
+  window.location.replace('index.html');
+}
+
+// Any interaction during the cooldown resets the 5s timer
+['touchstart', 'mousedown', 'keydown'].forEach(ev => {
+  document.addEventListener(ev, () => {
+    if (autoDisconnectTimer) scheduleAutoDisconnect();
+  }, { passive: true, capture: true });
+});
+
+// Phone sleep / app backgrounded during cooldown → disconnect now
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && autoDisconnectTimer) disconnectAndExit();
+});
+
 // Top Up — each tap fires a 1s burst, not recorded
 const btnTopup = document.getElementById('btn-topup');
 btnTopup.addEventListener('click', () => {
   if (dispensing) return;
   pourStartTime = null;
   dispensing = true;
+  cancelAutoDisconnect();
   btnTopup.style.background = 'linear-gradient(135deg, #003a10, #006020)';
   send({ cmd: 'dispense', value: true,  position: getDispensePosition() });
   setTimeout(() => {
@@ -769,6 +822,7 @@ function escHtml(s) {
 // ── Session ended overlay ────────────────────────────────────────
 let countdownTimer = null;
 function showSessionEnded(reason) {
+  cancelAutoDisconnect();
   stopDispense();
   stopKeepalive();
   setStatus('error', 'Session ended');

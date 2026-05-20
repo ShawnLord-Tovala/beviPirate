@@ -148,6 +148,36 @@
       opacity: 0;
     }
 
+    /* Restart prompt (shown after returning from a pour) */
+    #start-prompt {
+      width: 100%;
+      max-width: 480px;
+      padding: 32px 16px;
+      display: none;
+      text-align: center;
+    }
+    #start-prompt.show { display: block; }
+    #start-prompt p {
+      color: #888;
+      font-size: 0.9rem;
+      margin-bottom: 16px;
+    }
+    #btn-start {
+      width: 100%;
+      padding: 18px 12px;
+      border: none;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 800;
+      cursor: pointer;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, #4fc3f7, #0288d1);
+      color: #001a25;
+      box-shadow: 0 4px 20px rgba(79,195,247,0.35);
+    }
+    #btn-start:active { opacity: 0.7; }
+
     /* Highlighted control panel button */
     #btn-control {
       flex: 1 1 100%;
@@ -204,8 +234,13 @@
 
 <h1>Bevi QR Scanner</h1>
 
+<div id="start-prompt">
+  <p>Ready when you are.</p>
+  <button id="btn-start">Restart Scanning</button>
+</div>
+
 <div id="camera-wrap">
-  <video id="video" autoplay playsinline muted></video>
+  <video id="video" playsinline muted></video>
   <div id="overlay"><span></span></div>
   <div id="scan-line"></div>
 </div>
@@ -247,21 +282,48 @@
 
   // --- Camera ---
   async function startCamera() {
+    if (video.srcObject) return; // already running
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false
       });
       video.srcObject = stream;
+      try { await video.play(); } catch {}
       video.addEventListener('loadedmetadata', () => {
         canvas.width  = video.videoWidth;
         canvas.height = video.videoHeight;
         status.textContent = 'Point at a QR code…';
+        scanning = true;
         tick();
-      });
+      }, { once: true });
     } catch (e) {
       status.textContent = 'Camera error: ' + e.message;
     }
+  }
+
+  function stopCamera() {
+    scanning = false;
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+    if (video.srcObject) {
+      video.srcObject.getTracks().forEach(t => t.stop());
+      video.srcObject = null;
+    }
+  }
+
+  function showStartPrompt() {
+    stopCamera();
+    document.getElementById('camera-wrap').classList.add('minimized');
+    document.getElementById('start-prompt').classList.add('show');
+    status.textContent = '';
+  }
+
+  function hideStartPromptAndScan() {
+    document.getElementById('start-prompt').classList.remove('show');
+    document.getElementById('camera-wrap').classList.remove('minimized');
+    status.textContent = 'Starting camera…';
+    lastCode = null;
+    startCamera();
   }
 
   // --- Scan loop ---
@@ -359,11 +421,35 @@
     document.getElementById('camera-wrap').classList.remove('minimized');
     const existing = document.getElementById('btn-control');
     if (existing) existing.remove();
-    tick();
+    if (!video.srcObject) {
+      startCamera();
+    } else {
+      tick();
+    }
+  });
+
+  document.getElementById('btn-start').addEventListener('click', hideStartPromptAndScan);
+
+  // Release the camera when the page is hidden (phone sleep, app switch).
+  // When the page becomes visible again, drop the user back at the
+  // restart prompt so we don't silently hold the camera.
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      stopCamera();
+    } else if (!video.srcObject && result.style.display !== 'block') {
+      showStartPrompt();
+    }
   });
 
   // --- Start ---
-  startCamera();
+  // First load → auto-grab the camera.
+  // Returning from a successful pour → show the restart prompt instead.
+  if (sessionStorage.getItem('bevi.returning') === '1') {
+    sessionStorage.removeItem('bevi.returning');
+    showStartPrompt();
+  } else {
+    startCamera();
+  }
 </script>
 </body>
 </html>
